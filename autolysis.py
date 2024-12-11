@@ -12,6 +12,7 @@
 #   "tqdm"
 # ]
 # ///
+
 import os
 import sys
 import pandas as pd
@@ -168,6 +169,14 @@ class DataAnalysisTool:
         return dataframe
 
     def create_readme(self, dataframe, missing_data, correlations, outliers, clusters):
+    # Short storytelling prompts
+        storytelling_prompts = [
+            "Write an inspiring story about how analyzing this dataset uncovers its hidden potential.",
+            "Describe the dataset as a resilient underdog that overcame challenges to reveal valuable insights.",
+            "Create a heartwarming story of how this data fosters understanding and drives positive action.",
+            "Narrate how this dataset transforms from chaos to clarity, providing solutions to key issues."
+        ]
+
         analysis_context = f"""
         Dataset Summary:
         Total records: {dataframe.shape[0]}
@@ -186,31 +195,33 @@ class DataAnalysisTool:
         Cluster Analysis:
         {clusters}
         """
-        summary_story = self.query_ai(
-            "Craft a detailed and structured narrative based on dataset analysis insights.",
-            analysis_context
-        )
+        
+        # Generate the main narrative
+        narrative_prompt = storytelling_prompts[0]  # You can cycle through prompts or use randomly
+        summary_story = self.query_ai(narrative_prompt, analysis_context)
 
-        further_analysis = self.query_ai(
-            "Propose additional analysis steps based on the current insights.", analysis_context
-        )
+        # Propose further analysis steps
+        further_analysis_prompt = "Propose actionable next steps based on these data analysis findings."
+        further_analysis = self.query_ai(further_analysis_prompt, analysis_context)
 
         try:
             readme_path = os.path.join(SETTINGS["RESULTS_DIR"], "README.md")
             with open(readme_path, "w") as file:
                 file.write("# Analysis Report\n\n")
                 file.write(f"## Dataset Overview\n{analysis_context}\n\n")
+                file.write("## Story of the Data\n")
+                file.write(f"{summary_story}\n\n")
                 file.write("## Additional Insights\n")
                 file.write(f"{further_analysis}\n\n")
                 file.write("## Plots\n")
                 for img in os.listdir(SETTINGS["RESULTS_DIR"]):
                     if img.endswith(".png"):
                         file.write(f"![{img}](./{img})\n")
-                file.write("\n## Summary\n")
-                file.write(f"{summary_story}")
             logging.info(f"README.md has been successfully created at {readme_path}.")
         except Exception as error:
             logging.error(f"Error generating README file: {error}")
+
+
 
     def process_dataset(self, filepath):
         try:
@@ -247,4 +258,3 @@ if __name__ == "__main__":
     filepath = sys.argv[1]
     analysis_tool = DataAnalysisTool()
     analysis_tool.process_dataset(filepath)
-
