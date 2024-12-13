@@ -10,6 +10,7 @@
 #   "chardet",
 #   "requests",
 #   "tqdm"
+#   "uv"
 # ]
 # ///
 
