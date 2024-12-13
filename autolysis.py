@@ -1,261 +1,350 @@
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.9"
 # dependencies = [
-#   "httpx",
 #   "pandas",
-#   "matplotlib",
 #   "seaborn",
-#   "scikit-learn",
+#   "matplotlib",
 #   "numpy",
-#   "chardet",
+#   "scipy",
+#   "openai",
+#   "scikit-learn",
 #   "requests",
-#   "tqdm"
-#   "uv"
+#   "ipykernel",  # Added ipykernel
 # ]
 # ///
-
 import os
-import sys
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
 import numpy as np
-import chardet
+import seaborn as sns
+import matplotlib.pyplot as plt
+import argparse
 import requests
-import logging
-from tqdm import tqdm
+import json
+import openai 
 
-# Logging configuration
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Configuration for AI Proxy API
-SETTINGS = {
-    "PROXY_ENDPOINT": "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions",
-    "RESULTS_DIR": os.path.dirname(os.path.abspath(__file__)),
-    "MAX_IMAGES": 3,
-    "CHUNK_SIZE": 10000
-}
-
-class DataAnalysisTool:
-    def __init__(self):
-        self.image_counter = 0
-
-    def get_proxy_key(self):
-        try:
-            return os.environ["AIPROXY_TOKEN"]
-        except KeyError:
-            logging.error("AIPROXY_TOKEN environment variable not set.")
-            sys.exit(1)
-
-    def query_ai(self, prompt, context):
-        proxy_key = self.get_proxy_key()
-        try:
-            api_headers = {"Authorization": f"Bearer {proxy_key}", "Content-Type": "application/json"}
-            request_body = {
-                "model": "gpt-4o-mini",
-                "messages": [{"role": "user", "content": f"{prompt}\nContext:\n{context}"}]
-            }
-            response = requests.post(SETTINGS["PROXY_ENDPOINT"], headers=api_headers, json=request_body)
-            response.raise_for_status()
-            return response.json()['choices'][0]['message']['content']
-        except requests.exceptions.RequestException as error:
-            logging.error(f"AI Proxy communication error: {error}")
-            sys.exit(1)
-
-    def save_plot(self, filename):
-        if self.image_counter >= SETTINGS["MAX_IMAGES"]:
-            logging.warning("Image generation limit reached.")
-            return
-        try:
-            plt.gcf().set_size_inches(5.12, 5.12)
-            plt.tight_layout()
-            plt.savefig(
-                os.path.join(SETTINGS["RESULTS_DIR"], filename),
-                bbox_inches='tight',
-                dpi=100
-            )
-            plt.close()
-            self.image_counter += 1
-        except Exception as error:
-            logging.error(f"Error saving plot {filename}: {error}")
-
-    def get_file_encoding(self, filepath):
-        try:
-            with open(filepath, 'rb') as file:
-                raw_data = file.read()
-            detected_encoding = chardet.detect(raw_data)
-            return detected_encoding['encoding']
-        except Exception as error:
-            logging.error(f"Error detecting encoding for file {filepath}: {error}")
-            sys.exit(1)
-
-    def review_missing_values(self, dataframe):
-        missing_counts = dataframe.isnull().sum()
-        missing_percentages = (missing_counts / len(dataframe)) * 100
-        missing_summary = missing_percentages[missing_percentages > 0].sort_values(ascending=False)
-        if not missing_summary.empty:
-            plt.figure()
-            sns.barplot(x=missing_summary.index, y=missing_summary.values, color="lightblue")
-            plt.xticks(rotation=45, ha='right')
-            plt.title("Columns with Missing Data (%)")
-            plt.xlabel("Columns")
-            plt.ylabel("Missing Percentage")
-            self.save_plot("missing_data_report.png")
-        return missing_summary
-
-    def evaluate_correlation(self, dataframe):
-        numeric_data = dataframe.select_dtypes(include=[np.number])
-        if not numeric_data.empty:
-            correlations = numeric_data.corr()
-            plt.figure()
-            sns.heatmap(correlations, annot=True, cmap="coolwarm", fmt=".2f")
-            plt.title("Correlation Analysis")
-            self.save_plot("correlation_matrix.png")
-            return correlations
-        return None
-
-    def identify_outliers(self, dataframe):
-        numeric_data = dataframe.select_dtypes(include=[np.number])
-        outlier_data = {}
-        for column in numeric_data.columns:
-            q1 = numeric_data[column].quantile(0.25)
-            q3 = numeric_data[column].quantile(0.75)
-            iqr = q3 - q1
-            outlier_data[column] = numeric_data[(numeric_data[column] < q1 - 1.5 * iqr) | (numeric_data[column] > q3 + 1.5 * iqr)].shape[0]
-        return outlier_data
-
-    def perform_data_clustering(self, dataframe):
-        numeric_data = dataframe.select_dtypes(include=[np.number])
-        if not numeric_data.empty and numeric_data.shape[1] > 1:
-            pca = PCA(n_components=2)
-            reduced_data = pca.fit_transform(numeric_data.fillna(0))
-            kmeans = KMeans(n_clusters=3, random_state=42)
-            clusters = kmeans.fit_predict(reduced_data)
-            silhouette_avg = silhouette_score(reduced_data, clusters)
-            dataframe['Cluster_Group'] = clusters
-
-            plt.figure()
-            sns.scatterplot(
-                x=reduced_data[:, 0], y=reduced_data[:, 1],
-                hue=clusters, palette="viridis", s=50
-            )
-            plt.title(f"Cluster Representation (Silhouette Score: {silhouette_avg:.2f})")
-            plt.xlabel("Principal Component 1")
-            plt.ylabel("Principal Component 2")
-            self.save_plot("clusters.png")
-
-            return dataframe['Cluster_Group'].value_counts()
-        return None
-
-    def explore_distributions(self, dataframe):
-        numeric_columns = dataframe.select_dtypes(include=[np.number])
-        for column in numeric_columns.columns:
-            if self.image_counter >= SETTINGS["MAX_IMAGES"]:
-                break
-            plt.figure()
-            sns.histplot(dataframe[column], kde=True, bins=30, color="darkblue")
-            plt.title(f"Data Distribution: {column}")
-            plt.xlabel(column)
-            plt.ylabel("Frequency")
-            self.save_plot(f"{column}_distribution.png")
-
-    def feature_engineering(self, dataframe):
-        logging.info("Performing feature engineering...")
-        # Example: Adding interaction terms or binning variables
-        dataframe['total_columns'] = dataframe.shape[1]
-        # Add your specific feature engineering logic here
-        return dataframe
-
-    def create_readme(self, dataframe, missing_data, correlations, outliers, clusters):
-    # Short storytelling prompts
-        storytelling_prompts = [
-            "Write an inspiring story about how analyzing this dataset uncovers its hidden potential.",
-            "Describe the dataset as a resilient underdog that overcame challenges to reveal valuable insights.",
-            "Create a heartwarming story of how this data fosters understanding and drives positive action.",
-            "Narrate how this dataset transforms from chaos to clarity, providing solutions to key issues."
-        ]
-
-        analysis_context = f"""
-        Dataset Summary:
-        Total records: {dataframe.shape[0]}
-        Total fields: {dataframe.shape[1]}
-        Column names: {', '.join(dataframe.columns)}
-
-        Missing Values:
-        {missing_data}
-
-        Correlation Details:
-        {correlations}
-
-        Outliers Found:
-        {outliers}
-
-        Cluster Analysis:
-        {clusters}
-        """
-        
-        # Generate the main narrative
-        narrative_prompt = storytelling_prompts[0]  # You can cycle through prompts or use randomly
-        summary_story = self.query_ai(narrative_prompt, analysis_context)
-
-        # Propose further analysis steps
-        further_analysis_prompt = "Propose actionable next steps based on these data analysis findings."
-        further_analysis = self.query_ai(further_analysis_prompt, analysis_context)
-
-        try:
-            readme_path = os.path.join(SETTINGS["RESULTS_DIR"], "README.md")
-            with open(readme_path, "w") as file:
-                file.write("# Analysis Report\n\n")
-                file.write(f"## Dataset Overview\n{analysis_context}\n\n")
-                file.write("## Story of the Data\n")
-                file.write(f"{summary_story}\n\n")
-                file.write("## Additional Insights\n")
-                file.write(f"{further_analysis}\n\n")
-                file.write("## Plots\n")
-                for img in os.listdir(SETTINGS["RESULTS_DIR"]):
-                    if img.endswith(".png"):
-                        file.write(f"![{img}](./{img})\n")
-            logging.info(f"README.md has been successfully created at {readme_path}.")
-        except Exception as error:
-            logging.error(f"Error generating README file: {error}")
+def extract_numerical_insights(dataset):
+    """
+    Perform comprehensive statistical extraction on numerical columns
+    """
+    print("Initiating statistical exploration...")  # Operational marker
+    
+    # Numerical column extraction
+    numerical_columns = dataset.select_dtypes(include=[np.number])
+    
+    # Comprehensive statistical computation
+    statistical_summary = numerical_columns.agg([
+        'count', 
+        'mean', 
+        'median', 
+        'std', 
+        'min', 
+        'max', 
+        lambda x: x.quantile(0.25), 
+        lambda x: x.quantile(0.75)
+    ])
+    
+    # Missing value computation
+    column_nullity = dataset.isnull().sum()
+    
+    print("Statistical extraction completed.")  # Operational marker
+    return statistical_summary, column_nullity
 
 
+def identify_statistical_anomalies(dataset):
+    """
+    Detect statistical outliers using interquartile range methodology
+    """
+    print("Commencing anomaly detection...")  # Operational marker
+    
+    # Select numerical domains
+    numerical_domain = dataset.select_dtypes(include=[np.number])
+    
+    # Quartile-based outlier computation
+    q1_values = numerical_domain.quantile(0.25)
+    q3_values = numerical_domain.quantile(0.75)
+    
+    interquartile_range = q3_values - q1_values
+    
+    # Outlier boundary computation
+    lower_bound = q1_values - 1.5 * interquartile_range
+    upper_bound = q3_values + 1.5 * interquartile_range
+    
+    # Anomaly identification
+    anomalies = ((numerical_domain < lower_bound) | (numerical_domain > upper_bound)).sum()
+    
+    print("Anomaly detection finalized.")  # Operational marker
+    return anomalies
 
-    def process_dataset(self, filepath):
-        try:
-            file_encoding = self.get_file_encoding(filepath)
-            dataframe_iterator = pd.read_csv(filepath, encoding=file_encoding, chunksize=SETTINGS["CHUNK_SIZE"])
-            dataframe = pd.concat([chunk for chunk in dataframe_iterator])
 
-            logging.info(f"Dataset loaded successfully with shape {dataframe.shape}.")
+def generate_exploratory_visuals(correlation_matrix, anomalies, source_dataset, output_directory):
+    """
+    Create comprehensive visualization suite
+    """
+    print("Initiating visual representation generation...")  # Operational marker
+    
+    visualization_outputs = {}
+    
+    # Correlation matrix visualization
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.7)
+    plt.title('Interdimensional Correlation Matrix')
+    correlation_path = os.path.join(output_directory, 'correlation_matrix.png')
+    plt.savefig(correlation_path)
+    plt.close()
+    visualization_outputs['correlation'] = correlation_path
+    
+    # Anomaly visualization
+    if not anomalies.empty and anomalies.sum() > 0:
+        plt.figure(figsize=(12, 6))
+        anomalies.plot(kind='bar', color='crimson')
+        plt.title('Statistical Anomaly Landscape')
+        plt.xlabel('Feature Domains')
+        plt.ylabel('Anomaly Frequency')
+        anomaly_path = os.path.join(output_directory, 'outliers.png')
+        plt.savefig(anomaly_path)
+        plt.close()
+        visualization_outputs['anomalies'] = anomaly_path
+    
+    # Distribution visualization
+    numerical_columns = source_dataset.select_dtypes(include=[np.number]).columns
+    if len(numerical_columns) > 0:
+        initial_numerical_column = numerical_columns[0]
+        plt.figure(figsize=(12, 6))
+        sns.histplot(source_dataset[initial_numerical_column], kde=True, color='navy', bins=35)
+        plt.title(f'Distribution Landscape: {initial_numerical_column}')
+        distribution_path = os.path.join(output_directory, 'distribution_.png')
+        plt.savefig(distribution_path)
+        plt.close()
+        visualization_outputs['distribution'] = distribution_path
+    
+    print("Visual representation generation completed.")  # Operational marker
+    return visualization_outputs
+
+
+def create_readme(summary_stats, missing_values, corr_matrix, outliers, output_dir, narrative_text):
+    """
+    Create the README.md with a narrative and visualizations
+    """
+    print("Creating README file...")  # Debugging line
+    readme_file = os.path.join(output_dir, 'README.md')
+    try:
+        with open(readme_file, 'w') as f:
+            f.write("# Automated Data Analysis Report\n\n")
+
+            # Introduction Section
+            f.write("## Introduction\n")
+            f.write("This is an automated analysis of the dataset, providing summary statistics, visualizations, and insights from the data.\n\n")
+
+            # Summary Statistics Section
+            f.write("## Summary Statistics\n")
+            f.write("The summary statistics of the dataset are as follows:\n")
+            f.write("\n| Statistic    | Value |\n")
+            f.write("|--------------|-------|\n")
+
+            # Write summary statistics for each column (mean, std, min, etc.)
+            for column in summary_stats.columns:
+                f.write(f"| {column} - Mean | {summary_stats.loc['mean', column]:.2f} |\n")
+                f.write(f"| {column} - Std Dev | {summary_stats.loc['std', column]:.2f} |\n")
+                f.write(f"| {column} - Min | {summary_stats.loc['min', column]:.2f} |\n")
+                f.write(f"| {column} - 25th Percentile | {summary_stats.loc['25%', column]:.2f} |\n")
+                f.write(f"| {column} - 50th Percentile (Median) | {summary_stats.loc['50%', column]:.2f} |\n")
+                f.write(f"| {column} - 75th Percentile | {summary_stats.loc['75%', column]:.2f} |\n")
+                f.write(f"| {column} - Max | {summary_stats.loc['max', column]:.2f} |\n")
+                f.write("|--------------|-------|\n")
             
-            # Create a results folder specific to the dataset name
-            dataset_name = os.path.splitext(os.path.basename(filepath))[0]
-            results_folder = os.path.join(SETTINGS["RESULTS_DIR"], dataset_name)
-            os.makedirs(results_folder, exist_ok=True)
-            SETTINGS["RESULTS_DIR"] = results_folder
+            f.write("\n")
 
-            # Perform analysis
-            dataframe = self.feature_engineering(dataframe)
-            missing_data = self.review_missing_values(dataframe)
-            correlations = self.evaluate_correlation(dataframe)
-            outliers = self.identify_outliers(dataframe)
-            clusters = self.perform_data_clustering(dataframe)
-            self.explore_distributions(dataframe)
+            # Missing Values Section (Formatted as Table)
+            f.write("## Missing Values\n")
+            f.write("The following columns contain missing values, with their respective counts:\n")
+            f.write("\n| Column       | Missing Values Count |\n")
+            f.write("|--------------|----------------------|\n")
+            for column, count in missing_values.items():
+                f.write(f"| {column} | {count} |\n")
+            f.write("\n")
 
-            # Generate the README file in the dataset-specific folder
-            self.create_readme(dataframe, missing_data, correlations, outliers, clusters)
-            logging.info(f"Analysis results have been saved to the folder: {results_folder}")
-        except Exception as error:
-            logging.error(f"Error processing dataset: {error}")
+            # Outliers Detection Section (Formatted as Table)
+            f.write("## Outliers Detection\n")
+            f.write("The following columns contain outliers detected using the IQR method (values beyond the typical range):\n")
+            f.write("\n| Column       | Outlier Count |\n")
+            f.write("|--------------|---------------|\n")
+            for column, count in outliers.items():
+                f.write(f"| {column} | {count} |\n")
+            f.write("\n")
+
+            # Correlation Matrix Section
+            f.write("## Correlation Matrix\n")
+            f.write("Below is the correlation matrix of numerical features, indicating relationships between different variables:\n\n")
+            f.write("![Correlation Matrix](correlation_matrix.png)\n\n")
+
+            # Outliers Visualization Section
+            f.write("## Outliers Visualization\n")
+            f.write("This chart visualizes the number of outliers detected in each column:\n\n")
+            f.write("![Outliers](outliers.png)\n\n")
+
+            # Distribution Plot Section
+            f.write("## Distribution of Data\n")
+            f.write("Below is the distribution plot of the first numerical column in the dataset:\n\n")
+            f.write("![Distribution](distribution_.png)\n\n")
+
+            # Conclusion Section
+            f.write("## Conclusion\n")
+            f.write("The analysis has provided insights into the dataset, including summary statistics, outlier detection, and correlations between key variables.\n")
+            f.write("The generated visualizations and statistical insights can help in understanding the patterns and relationships in the data.\n\n")
+
+            # Story Section
+            f.write("## Data Story\n")
+            f.write(narrative_text)
+
+        print(f"README file created: {readme_file}")  # Debugging line
+        return readme_file
+    except Exception as e:
+        print(f"Error writing to README.md: {e}")
+        return None
+
+
+def question_llm(prompt, context):
+    """
+    Generate a heart-touching narrative using the OpenAI API
+    """
+    print("Generating story using LLM...")  # Debugging line
+    try:
+        # Get the AIPROXY_TOKEN from the environment variable
+        token = os.environ["AIPROXY_TOKEN"]
+
+        # Set the custom API base URL for the proxy
+        api_url = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
+
+        # Construct the full prompt with emphasis on emotional depth
+        full_prompt = f"""
+        Create a profoundly moving and emotionally resonant story that emerges from the data analysis. 
+        The narrative should:
+        - Reveal the human stories hidden behind the numbers
+        - Evoke deep empathy and emotional connection
+        - Transform cold statistics into a warm, compassionate narrative
+        - Use metaphors and personal perspectives to humanize the data
+
+        Data Context:
+        {context}
+
+        Storytelling Guidelines:
+        - The story must touch the heart
+        - Use poetic language and deep emotional insight
+        - Connect abstract data points to real human experiences
+        - Create a narrative that makes the reader feel deeply
+        - Explore themes of hope, resilience, transformation, and human connection
+
+        Story Prompt:
+        {prompt}
+        """
+
+        # Prepare headers
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Prepare the body with the model and prompt
+        data = {
+            "model": "gpt-4o-mini",  # Specific model for proxy
+            "messages": [
+                {"role": "system", "content": "You are a deeply empathetic storyteller who can transform data into an emotional journey."},
+                {"role": "user", "content": full_prompt}
+            ],
+            "max_tokens": 1500,
+            "temperature": 0.8
+        }
+
+        # Send the POST request to the proxy
+        response = requests.post(api_url, headers=headers, data=json.dumps(data))
+
+        # Check for successful response
+        if response.status_code == 200:
+            # Extract the story from the response
+            story = response.json()['choices'][0]['message']['content'].strip()
+            print("Story generated.")  # Debugging line
+            return story
+        else:
+            print(f"Error with request: {response.status_code} - {response.text}")
+            return """
+## A Story of Resilience
+
+In the quiet spaces between numbers and data points, there lies a profound human story. Our data is more than just statistics—it's a testament to the incredible journey of human experience.
+
+Each number represents a heartbeat, a moment of struggle, a breath of hope. Behind every data point is a person, with dreams, challenges, and an unbreakable spirit of resilience.
+
+Though our analysis reveals patterns and anomalies, the true richness lies in the untold stories of courage, adaptation, and transformation that these numbers hint at but cannot fully capture.
+
+In the end, data is just a reflection of our shared human narrative—complex, beautiful, and endlessly inspiring.
+"""
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return """
+## A Story of Resilience
+
+In the quiet spaces between numbers and data points, there lies a profound human story. Our data is more than just statistics—it's a testament to the incredible journey of human experience.
+
+Each number represents a heartbeat, a moment of struggle, a breath of hope. Behind every data point is a person, with dreams, challenges, and an unbreakable spirit of resilience.
+
+Though our analysis reveals patterns and anomalies, the true richness lies in the untold stories of courage, adaptation, and transformation that these numbers hint at but cannot fully capture.
+
+In the end, data is just a reflection of our shared human narrative—complex, beautiful, and endlessly inspiring.
+"""
+
+
+def main(csv_file):
+    """
+    Main function that integrates all the steps
+    """
+    print("Starting the analysis...")  # Debugging line
+
+    # Try reading the CSV file with 'ISO-8859-1' encoding to handle special characters
+    try:
+        df = pd.read_csv(csv_file, encoding='ISO-8859-1')
+        print("Dataset loaded successfully!")  # Debugging line
+    except UnicodeDecodeError as e:
+        print(f"Error reading file: {e}")
+        return
+
+    summary_stats, missing_values = extract_numerical_insights(df)
+
+    # Debugging print
+    print("Summary Stats:")
+    print(summary_stats)
+
+    outliers = identify_statistical_anomalies(df)
+
+    # Debugging print
+    print("Outliers detected:")
+    print(outliers)
+
+    output_dir = "."
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Select only numeric columns for correlation
+    corr_matrix = df.select_dtypes(include=[np.number]).corr()
+
+    # Visualize the data and check output paths
+    heatmap_file, outliers_file, dist_plot_file = generate_exploratory_visuals(corr_matrix, outliers, df, output_dir)
+
+    print("Visualizations saved.")
+
+    # Generate the story using the LLM
+    story = question_llm("Generate a deeply emotional story from the analysis", 
+                         context=f"Dataset Analysis:\nSummary Statistics:\n{summary_stats}\n\nMissing Values:\n{missing_values}\n\nCorrelation Matrix:\n{corr_matrix}\n\nOutliers:\n{outliers}")
+
+    # Create the README file with the analysis and the story
+    readme_file = create_readme(summary_stats, missing_values, corr_matrix, outliers, output_dir, story)
+    
+    print(f"Analysis complete! Results saved in '{output_dir}' directory.")
+    print(f"README file: {readme_file}")
+    print(f"Visualizations: {heatmap_file}, {outliers_file}, {dist_plot_file}")
+
 
 if __name__ == "__main__":
+    import sys
     if len(sys.argv) < 2:
-        logging.error("Usage: python script.py <path_to_csv_file>")
+        print("Usage: python script.py <dataset_path>")
         sys.exit(1)
-    filepath = sys.argv[1]
-    analysis_tool = DataAnalysisTool()
-    analysis_tool.process_dataset(filepath)
+    main(sys.argv[1])
