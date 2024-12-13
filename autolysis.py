@@ -282,31 +282,10 @@ def question_llm(prompt, context):
             return story
         else:
             print(f"Error with request: {response.status_code} - {response.text}")
-            return """
-## A Story of Resilience
-
-In the quiet spaces between numbers and data points, there lies a profound human story. Our data is more than just statistics—it's a testament to the incredible journey of human experience.
-
-Each number represents a heartbeat, a moment of struggle, a breath of hope. Behind every data point is a person, with dreams, challenges, and an unbreakable spirit of resilience.
-
-Though our analysis reveals patterns and anomalies, the true richness lies in the untold stories of courage, adaptation, and transformation that these numbers hint at but cannot fully capture.
-
-In the end, data is just a reflection of our shared human narrative—complex, beautiful, and endlessly inspiring.
-"""
-
+            return None
     except Exception as e:
         print(f"Error: {e}")
-        return """
-## A Story of Resilience
-
-In the quiet spaces between numbers and data points, there lies a profound human story. Our data is more than just statistics—it's a testament to the incredible journey of human experience.
-
-Each number represents a heartbeat, a moment of struggle, a breath of hope. Behind every data point is a person, with dreams, challenges, and an unbreakable spirit of resilience.
-
-Though our analysis reveals patterns and anomalies, the true richness lies in the untold stories of courage, adaptation, and transformation that these numbers hint at but cannot fully capture.
-
-In the end, data is just a reflection of our shared human narrative—complex, beautiful, and endlessly inspiring.
-"""
+        return None
 
 
 def main(csv_file):
