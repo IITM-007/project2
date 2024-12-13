@@ -118,85 +118,101 @@ def generate_exploratory_visuals(correlation_matrix, anomalies, source_dataset, 
         visualization_outputs['distribution'] = distribution_path
     
     print("Visual representation generation completed.")  # Operational marker
-    return visualization_outputs
+    return (
+        visualization_outputs.get('correlation', ''), 
+        visualization_outputs.get('anomalies', ''), 
+        visualization_outputs.get('distribution', '')
+    )
 
 
-def create_readme(summary_stats, missing_values, corr_matrix, outliers, output_dir, narrative_text):
+def create_readme(summary_stats, missing_values, corr_matrix, outliers, output_dir, story=None):
     """
-    Create the README.md with a narrative and visualizations
+    Create a comprehensive README with analysis insights and optional narrative
     """
-    print("Creating README file...")  # Debugging line
+    print("Creating README file...")
     readme_file = os.path.join(output_dir, 'README.md')
     try:
-        with open(readme_file, 'w') as f:
-            f.write("# Automated Data Analysis Report\n\n")
-
-            # Introduction Section
-            f.write("## Introduction\n")
-            f.write("This is an automated analysis of the dataset, providing summary statistics, visualizations, and insights from the data.\n\n")
-
-            # Summary Statistics Section
-            f.write("## Summary Statistics\n")
-            f.write("The summary statistics of the dataset are as follows:\n")
-            f.write("\n| Statistic    | Value |\n")
-            f.write("|--------------|-------|\n")
-
-            # Write summary statistics for each column (mean, std, min, etc.)
-            for column in summary_stats.columns:
-                f.write(f"| {column} - Mean | {summary_stats.loc['mean', column]:.2f} |\n")
-                f.write(f"| {column} - Std Dev | {summary_stats.loc['std', column]:.2f} |\n")
-                f.write(f"| {column} - Min | {summary_stats.loc['min', column]:.2f} |\n")
-                f.write(f"| {column} - 25th Percentile | {summary_stats.loc['25%', column]:.2f} |\n")
-                f.write(f"| {column} - 50th Percentile (Median) | {summary_stats.loc['50%', column]:.2f} |\n")
-                f.write(f"| {column} - 75th Percentile | {summary_stats.loc['75%', column]:.2f} |\n")
-                f.write(f"| {column} - Max | {summary_stats.loc['max', column]:.2f} |\n")
-                f.write("|--------------|-------|\n")
+        with open(readme_file, 'w', encoding='utf-8') as f:
+            # Title and Introduction
+            f.write("# 📊 Data Journey: From Numbers to Narrative\n\n")
             
-            f.write("\n")
+            # Optional Story Section
+            if story:
+                f.write("## 📖 The Human Story Behind the Data\n")
+                f.write(f"{story}\n\n")
+            
+            f.write("## 🔍 Dataset Characteristics\n")
+            f.write("### Key Details\n")
+            f.write(f"- **Total Columns**: {len(summary_stats.columns)}\n")
+            f.write(f"- **Numeric Columns**: {len(summary_stats.columns)}\n")
+            f.write(f"- **Total Observations**: {summary_stats.loc['count'].max()}\n\n")
 
-            # Missing Values Section (Formatted as Table)
-            f.write("## Missing Values\n")
-            f.write("The following columns contain missing values, with their respective counts:\n")
-            f.write("\n| Column       | Missing Values Count |\n")
-            f.write("|--------------|----------------------|\n")
-            for column, count in missing_values.items():
-                f.write(f"| {column} | {count} |\n")
-            f.write("\n")
+            # Analysis Methodology
+            f.write("## 🧪 Analysis Methodology\n")
+            f.write("The analysis employed several robust statistical techniques:\n")
+            f.write("- Descriptive Statistics\n")
+            f.write("- Missing Value Analysis\n")
+            f.write("- Outlier Detection (Interquartile Range Method)\n")
+            f.write("- Correlation Matrix Computation\n\n")
 
-            # Outliers Detection Section (Formatted as Table)
-            f.write("## Outliers Detection\n")
-            f.write("The following columns contain outliers detected using the IQR method (values beyond the typical range):\n")
-            f.write("\n| Column       | Outlier Count |\n")
-            f.write("|--------------|---------------|\n")
-            for column, count in outliers.items():
-                f.write(f"| {column} | {count} |\n")
-            f.write("\n")
+            # Key Insights
+            f.write("## 💡 Key Insights\n")
+            
+            # Summary Statistics Insights
+            f.write("### Statistical Highlights\n")
+            for column in summary_stats.columns:
+                f.write(f"**{column}**:\n")
+                f.write(f"- *Mean*: {summary_stats.loc['mean', column]:.2f}\n")
+                f.write(f"- *Standard Deviation*: {summary_stats.loc['std', column]:.2f}\n")
+                f.write(f"- *Range*: {summary_stats.loc['min', column]:.2f} - {summary_stats.loc['max', column]:.2f}\n\n")
 
-            # Correlation Matrix Section
-            f.write("## Correlation Matrix\n")
-            f.write("Below is the correlation matrix of numerical features, indicating relationships between different variables:\n\n")
+            # Missing Values Insights
+            f.write("### Missing Data\n")
+            missing_columns = missing_values[missing_values > 0]
+            if not missing_columns.empty:
+                f.write("Columns with missing values:\n")
+                for col, count in missing_columns.items():
+                    f.write(f"- **{col}**: {count} missing entries\n")
+            else:
+                f.write("*No missing values detected in the dataset.*\n\n")
+
+            # Outliers Insights
+            f.write("### Outlier Analysis\n")
+            if outliers.sum() > 0:
+                f.write("Columns with statistical outliers:\n")
+                for col, count in outliers.items():
+                    if count > 0:
+                        f.write(f"- **{col}**: {count} outliers detected\n")
+            else:
+                f.write("*No significant outliers found in the dataset.*\n\n")
+
+            # Visualizations Section
+            f.write("## 📈 Visualizations\n")
+            f.write("### Correlation Matrix\n")
             f.write("![Correlation Matrix](correlation_matrix.png)\n\n")
+            
+            if outliers.sum() > 0:
+                f.write("### Outliers Distribution\n")
+                f.write("![Outliers](outliers.png)\n\n")
 
-            # Outliers Visualization Section
-            f.write("## Outliers Visualization\n")
-            f.write("This chart visualizes the number of outliers detected in each column:\n\n")
-            f.write("![Outliers](outliers.png)\n\n")
-
-            # Distribution Plot Section
-            f.write("## Distribution of Data\n")
-            f.write("Below is the distribution plot of the first numerical column in the dataset:\n\n")
+            f.write("### Data Distribution\n")
             f.write("![Distribution](distribution_.png)\n\n")
 
-            # Conclusion Section
-            f.write("## Conclusion\n")
-            f.write("The analysis has provided insights into the dataset, including summary statistics, outlier detection, and correlations between key variables.\n")
-            f.write("The generated visualizations and statistical insights can help in understanding the patterns and relationships in the data.\n\n")
+            # Implications and Recommendations
+            f.write("## 🚀 Implications and Recommendations\n")
+            f.write("Based on our comprehensive analysis, consider the following:\n")
+            f.write("1. **Data Quality**: Review columns with missing values or outliers\n")
+            f.write("2. **Further Investigation**: Deep dive into statistically significant variations\n")
+            f.write("3. **Potential Next Steps**: \n")
+            f.write("   - Data cleaning and preprocessing\n")
+            f.write("   - Advanced statistical modeling\n")
+            f.write("   - Machine learning feature engineering\n\n")
 
-            # Story Section
-            f.write("## Data Story\n")
-            f.write(narrative_text)
+            # Closing Note
+            f.write("## 🌟 Final Thoughts\n")
+            f.write("Data tells a story. Our analysis is just the beginning of understanding the deeper narrative within these numbers.\n")
 
-        print(f"README file created: {readme_file}")  # Debugging line
+        print(f"README file created: {readme_file}")
         return readme_file
     except Exception as e:
         print(f"Error writing to README.md: {e}")
@@ -205,9 +221,9 @@ def create_readme(summary_stats, missing_values, corr_matrix, outliers, output_d
 
 def question_llm(prompt, context):
     """
-    Generate a heart-touching narrative using the OpenAI API
+    Generate an emotional narrative using the OpenAI API
     """
-    print("Generating story using LLM...")  # Debugging line
+    print("Generating story using LLM...")
     try:
         # Get the AIPROXY_TOKEN from the environment variable
         token = os.environ["AIPROXY_TOKEN"]
@@ -262,7 +278,7 @@ def question_llm(prompt, context):
         if response.status_code == 200:
             # Extract the story from the response
             story = response.json()['choices'][0]['message']['content'].strip()
-            print("Story generated.")  # Debugging line
+            print("Story generated.")
             return story
         else:
             print(f"Error with request: {response.status_code} - {response.text}")
@@ -297,27 +313,18 @@ def main(csv_file):
     """
     Main function that integrates all the steps
     """
-    print("Starting the analysis...")  # Debugging line
+    print("Starting the analysis...")
 
     # Try reading the CSV file with 'ISO-8859-1' encoding to handle special characters
     try:
         df = pd.read_csv(csv_file, encoding='ISO-8859-1')
-        print("Dataset loaded successfully!")  # Debugging line
+        print("Dataset loaded successfully!")
     except UnicodeDecodeError as e:
         print(f"Error reading file: {e}")
         return
 
     summary_stats, missing_values = extract_numerical_insights(df)
-
-    # Debugging print
-    print("Summary Stats:")
-    print(summary_stats)
-
     outliers = identify_statistical_anomalies(df)
-
-    # Debugging print
-    print("Outliers detected:")
-    print(outliers)
 
     output_dir = "."
     os.makedirs(output_dir, exist_ok=True)
