@@ -9,7 +9,7 @@
 #   "openai",
 #   "scikit-learn",
 #   "requests",
-#   "ipykernel"
+#   "ipykernel",
 # ]
 # ///
 import os
