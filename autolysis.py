@@ -9,7 +9,7 @@
 #   "openai",
 #   "scikit-learn",
 #   "requests",
-#   "ipykernel",  # Added for comprehensive data interaction
+#   "ipykernel",
 # ]
 # ///
 
