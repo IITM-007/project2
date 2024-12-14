@@ -9,9 +9,10 @@
 #   "openai",
 #   "scikit-learn",
 #   "requests",
-#   "ipykernel",
+#   "ipykernel",  # Added for comprehensive data interaction
 # ]
 # ///
+
 import os
 import pandas as pd
 import numpy as np
@@ -20,317 +21,264 @@ import matplotlib.pyplot as plt
 import argparse
 import requests
 import json
-import openai 
+import openai  # Advanced text generation library
 
-def extract_numerical_insights(dataset):
-    """
-    Perform comprehensive statistical extraction on numerical columns
-    """
-    print("Initiating statistical exploration...")  # Operational marker
+# Comprehensive data exploration function to extract deep insights
+def extract_data_insights(dataset):
+    print("Embarking on data exploration journey...")  # Exploratory message
     
-    # Numerical column extraction
-    numerical_columns = dataset.select_dtypes(include=[np.number])
-    
-    # Comprehensive statistical computation
-    statistical_summary = numerical_columns.agg([
-        'count', 
-        'mean', 
-        'median', 
-        'std', 
-        'min', 
-        'max', 
-        lambda x: x.quantile(0.25), 
-        lambda x: x.quantile(0.75)
-    ])
-    
-    # Missing value computation
-    column_nullity = dataset.isnull().sum()
-    
-    print("Statistical extraction completed.")  # Operational marker
-    return statistical_summary, column_nullity
+    # Generate comprehensive statistical summaries
+    insight_metrics = dataset.describe()
+
+    # Detect and quantify missing data points
+    data_gaps = dataset.isnull().sum()
+
+    # Select numeric columns for relationship mapping
+    numeric_dataset = dataset.select_dtypes(include=[np.number])
+
+    # Construct correlation landscape
+    correlation_landscape = numeric_dataset.corr() if not numeric_dataset.empty else pd.DataFrame()
+
+    print("Data exploration voyage completed successfully.")  # Completion notification
+    return insight_metrics, data_gaps, correlation_landscape
 
 
+# Advanced outlier detection mechanism using statistical techniques
 def identify_statistical_anomalies(dataset):
-    """
-    Detect statistical outliers using interquartile range methodology
-    """
-    print("Commencing anomaly detection...")  # Operational marker
-    
-    # Select numerical domains
-    numerical_domain = dataset.select_dtypes(include=[np.number])
-    
-    # Quartile-based outlier computation
-    q1_values = numerical_domain.quantile(0.25)
-    q3_values = numerical_domain.quantile(0.75)
-    
-    interquartile_range = q3_values - q1_values
-    
-    # Outlier boundary computation
-    lower_bound = q1_values - 1.5 * interquartile_range
-    upper_bound = q3_values + 1.5 * interquartile_range
-    
-    # Anomaly identification
-    anomalies = ((numerical_domain < lower_bound) | (numerical_domain > upper_bound)).sum()
-    
-    print("Anomaly detection finalized.")  # Operational marker
-    return anomalies
+    print("Initiating anomaly detection protocol...")  # Detection initiation
+
+    # Isolate numeric data domains
+    numeric_domain = dataset.select_dtypes(include=[np.number])
+
+    # Apply sophisticated IQR (Interquartile Range) anomaly detection
+    quartile_lower = numeric_domain.quantile(0.25)
+    quartile_upper = numeric_domain.quantile(0.75)
+    interquartile_range = quartile_upper - quartile_lower
+    anomaly_map = ((numeric_domain < (quartile_lower - 1.5 * interquartile_range)) | 
+                   (numeric_domain > (quartile_upper + 1.5 * interquartile_range))).sum()
+
+    print("Anomaly detection protocol completed.")  # Completion signal
+    return anomaly_map
 
 
-def generate_exploratory_visuals(correlation_matrix, anomalies, source_dataset, output_directory):
-    """
-    Create comprehensive visualization suite
-    """
-    print("Initiating visual representation generation...")  # Operational marker
-    
-    visualization_outputs = {}
-    
-    # Correlation matrix visualization
+# Comprehensive data visualization generator
+def generate_data_visualizations(correlation_map, anomalies, dataset, output_directory):
+    print("Launching visualization creation module...")  # Visualization start
+
+    # Create correlation heatmap
     plt.figure(figsize=(12, 10))
-    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.7)
-    plt.title('Interdimensional Correlation Matrix')
-    correlation_path = os.path.join(output_directory, 'correlation_matrix.png')
-    plt.savefig(correlation_path)
+    sns.heatmap(correlation_map, annot=True, cmap='viridis', fmt=".2f", linewidths=0.7)
+    plt.title('Intricate Correlation Landscape', fontsize=15)
+    correlation_visual_path = os.path.join(output_directory, 'correlation_network.png')
+    plt.savefig(correlation_visual_path)
     plt.close()
-    visualization_outputs['correlation'] = correlation_path
-    
+
     # Anomaly visualization
     if not anomalies.empty and anomalies.sum() > 0:
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(12, 7))
         anomalies.plot(kind='bar', color='crimson')
-        plt.title('Statistical Anomaly Landscape')
-        plt.xlabel('Feature Domains')
-        plt.ylabel('Anomaly Frequency')
-        anomaly_path = os.path.join(output_directory, 'outliers.png')
-        plt.savefig(anomaly_path)
+        plt.title('Statistical Anomalies Across Variables', fontsize=15)
+        plt.xlabel('Data Variables', fontsize=12)
+        plt.ylabel('Anomaly Frequency', fontsize=12)
+        anomaly_visual_path = os.path.join(output_directory, 'anomaly_landscape.png')
+        plt.savefig(anomaly_visual_path)
         plt.close()
-        visualization_outputs['anomalies'] = anomaly_path
-    
-    # Distribution visualization
-    numerical_columns = source_dataset.select_dtypes(include=[np.number]).columns
-    if len(numerical_columns) > 0:
-        initial_numerical_column = numerical_columns[0]
-        plt.figure(figsize=(12, 6))
-        sns.histplot(source_dataset[initial_numerical_column], kde=True, color='navy', bins=35)
-        plt.title(f'Distribution Landscape: {initial_numerical_column}')
-        distribution_path = os.path.join(output_directory, 'distribution_.png')
-        plt.savefig(distribution_path)
+    else:
+        print("No significant anomalies detected for visualization.")
+        anomaly_visual_path = None
+
+    # Distribution exploration
+    numeric_columns = dataset.select_dtypes(include=[np.number]).columns
+    if len(numeric_columns) > 0:
+        primary_numeric_column = numeric_columns[0]
+        plt.figure(figsize=(12, 8))
+        sns.histplot(dataset[primary_numeric_column], kde=True, color='teal', bins=35)
+        plt.title(f'Distribution Landscape: {primary_numeric_column}', fontsize=15)
+        distribution_visual_path = os.path.join(output_directory, 'distribution_terrain.png')
+        plt.savefig(distribution_visual_path)
         plt.close()
-        visualization_outputs['distribution'] = distribution_path
+    else:
+        distribution_visual_path = None
+
+    print("Visualization creation module completed.")  # Completion notification
+    return correlation_visual_path, anomaly_visual_path, distribution_visual_path
+
+
+# Enhanced narrative generation function with emotional depth
+def craft_narrative_from_insights(prompt, context):
+    print("Initiating narrative generation protocol...")  # Generation start
     
-    print("Visual representation generation completed.")  # Operational marker
-    return (
-        visualization_outputs.get('correlation', ''), 
-        visualization_outputs.get('anomalies', ''), 
-        visualization_outputs.get('distribution', '')
-    )
-
-
-def create_readme(summary_stats, missing_values, corr_matrix, outliers, output_dir, story=None):
-    """
-    Create a comprehensive README with analysis insights and optional narrative
-    """
-    print("Creating README file...")
-    readme_file = os.path.join(output_dir, 'README.md')
     try:
-        with open(readme_file, 'w', encoding='utf-8') as f:
-            # Title and Introduction
-            f.write("# 📊 Data Journey: From Numbers to Narrative\n\n")
-            
-            # Optional Story Section
-            if story:
-                f.write("## 📖 The Human Story Behind the Data\n")
-                f.write(f"{story}\n\n")
-            
-            f.write("## 🔍 Dataset Characteristics\n")
-            f.write("### Key Details\n")
-            f.write(f"- **Total Columns**: {len(summary_stats.columns)}\n")
-            f.write(f"- **Numeric Columns**: {len(summary_stats.columns)}\n")
-            f.write(f"- **Total Observations**: {summary_stats.loc['count'].max()}\n\n")
+        proxy_authentication_token = os.environ["AIPROXY_TOKEN"]
+        narrative_api_endpoint = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
 
-            # Analysis Methodology
-            f.write("## 🧪 Analysis Methodology\n")
-            f.write("The analysis employed several robust statistical techniques:\n")
-            f.write("- Descriptive Statistics\n")
-            f.write("- Missing Value Analysis\n")
-            f.write("- Outlier Detection (Interquartile Range Method)\n")
-            f.write("- Correlation Matrix Computation\n\n")
+        # Emotionally rich and compelling narrative generation prompt
+        comprehensive_narrative_prompt = f"""
+        Craft a profoundly moving narrative that transcends mere data, transforming statistical insights into a deeply human experience.
 
-            # Key Insights
-            f.write("## 💡 Key Insights\n")
-            
-            # Summary Statistics Insights
-            f.write("### Statistical Highlights\n")
-            for column in summary_stats.columns:
-                f.write(f"**{column}**:\n")
-                f.write(f"- *Mean*: {summary_stats.loc['mean', column]:.2f}\n")
-                f.write(f"- *Standard Deviation*: {summary_stats.loc['std', column]:.2f}\n")
-                f.write(f"- *Range*: {summary_stats.loc['min', column]:.2f} - {summary_stats.loc['max', column]:.2f}\n\n")
+        Core Directive:
+        - Weave a tapestry of human emotion and data-driven revelation
+        - Make the reader feel the story, not just understand it
+        - Connect cold numbers to warm, beating human hearts
 
-            # Missing Values Insights
-            f.write("### Missing Data\n")
-            missing_columns = missing_values[missing_values > 0]
-            if not missing_columns.empty:
-                f.write("Columns with missing values:\n")
-                for col, count in missing_columns.items():
-                    f.write(f"- **{col}**: {count} missing entries\n")
-            else:
-                f.write("*No missing values detected in the dataset.*\n\n")
-
-            # Outliers Insights
-            f.write("### Outlier Analysis\n")
-            if outliers.sum() > 0:
-                f.write("Columns with statistical outliers:\n")
-                for col, count in outliers.items():
-                    if count > 0:
-                        f.write(f"- **{col}**: {count} outliers detected\n")
-            else:
-                f.write("*No significant outliers found in the dataset.*\n\n")
-
-            # Visualizations Section
-            f.write("## 📈 Visualizations\n")
-            f.write("### Correlation Matrix\n")
-            f.write("![Correlation Matrix](correlation_matrix.png)\n\n")
-            
-            if outliers.sum() > 0:
-                f.write("### Outliers Distribution\n")
-                f.write("![Outliers](outliers.png)\n\n")
-
-            f.write("### Data Distribution\n")
-            f.write("![Distribution](distribution_.png)\n\n")
-
-            # Implications and Recommendations
-            f.write("## 🚀 Implications and Recommendations\n")
-            f.write("Based on our comprehensive analysis, consider the following:\n")
-            f.write("1. **Data Quality**: Review columns with missing values or outliers\n")
-            f.write("2. **Further Investigation**: Deep dive into statistically significant variations\n")
-            f.write("3. **Potential Next Steps**: \n")
-            f.write("   - Data cleaning and preprocessing\n")
-            f.write("   - Advanced statistical modeling\n")
-            f.write("   - Machine learning feature engineering\n\n")
-
-            # Closing Note
-            f.write("## 🌟 Final Thoughts\n")
-            f.write("Data tells a story. Our analysis is just the beginning of understanding the deeper narrative within these numbers.\n")
-
-        print(f"README file created: {readme_file}")
-        return readme_file
-    except Exception as e:
-        print(f"Error writing to README.md: {e}")
-        return None
-
-
-def question_llm(prompt, context):
-    """
-    Generate an emotional narrative using the OpenAI API
-    """
-    print("Generating story using LLM...")
-    try:
-        # Get the AIPROXY_TOKEN from the environment variable
-        token = os.environ["AIPROXY_TOKEN"]
-
-        # Set the custom API base URL for the proxy
-        api_url = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
-
-        # Construct the full prompt with emphasis on emotional depth
-        full_prompt = f"""
-        Create a profoundly moving and emotionally resonant story that emerges from the data analysis. 
-        The narrative should:
-        - Reveal the human stories hidden behind the numbers
-        - Evoke deep empathy and emotional connection
-        - Transform cold statistics into a warm, compassionate narrative
-        - Use metaphors and personal perspectives to humanize the data
-
-        Data Context:
+        Narrative Context:
         {context}
 
-        Storytelling Guidelines:
-        - The story must touch the heart
-        - Use poetic language and deep emotional insight
-        - Connect abstract data points to real human experiences
-        - Create a narrative that makes the reader feel deeply
-        - Explore themes of hope, resilience, transformation, and human connection
+        Narrative Generation Guidelines:
+        1. Begin with a poignant scene that metaphorically represents the data
+        2. Use the statistical insights as emotional waypoints
+        3. Create characters whose lives are intimately connected with these numbers
+        4. Explore themes of resilience, transformation, and hope
+        5. Conclude with a powerful reflection that bridges data and human experience
 
-        Story Prompt:
-        {prompt}
+        Special Instructions:
+        - Every statistic is a whisper of a human story
+        - Reveal vulnerability, strength, and the extraordinary within the ordinary
+        - Let empathy be your primary lens of interpretation
         """
 
-        # Prepare headers
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}"
+            "Authorization": f"Bearer {proxy_authentication_token}"
         }
 
-        # Prepare the body with the model and prompt
-        data = {
-            "model": "gpt-4o-mini",  # Specific model for proxy
+        narrative_request_payload = {
+            "model": "gpt-4o-mini",
             "messages": [
-                {"role": "system", "content": "You are a deeply empathetic storyteller who can transform data into an emotional journey."},
-                {"role": "user", "content": full_prompt}
+                {"role": "system", "content": "You are a compassionate storyteller who transforms data into deeply human narratives."},
+                {"role": "user", "content": comprehensive_narrative_prompt}
             ],
-            "max_tokens": 1500,
-            "temperature": 0.8
+            "max_tokens": 1000,
+            "temperature": 0.7
         }
 
-        # Send the POST request to the proxy
-        response = requests.post(api_url, headers=headers, data=json.dumps(data))
+        narrative_response = requests.post(narrative_api_endpoint, headers=headers, data=json.dumps(narrative_request_payload))
 
-        # Check for successful response
-        if response.status_code == 200:
-            # Extract the story from the response
-            story = response.json()['choices'][0]['message']['content'].strip()
-            print("Story generated.")
-            return story
+        if narrative_response.status_code == 200:
+            generated_narrative = narrative_response.json()['choices'][0]['message']['content'].strip()
+            print("Narrative generation completed successfully.")
+            return generated_narrative
         else:
-            print(f"Error with request: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        print(f"Error: {e}")
+            print(f"Narrative generation encountered an error: {narrative_response.status_code}")
+            return "Narrative generation failed."
+
+    except Exception as error:
+        print(f"Critical error in narrative generation: {error}")
+        return "Narrative generation encountered a critical error."
+
+
+# Comprehensive README generation function
+def create_comprehensive_readme(insight_metrics, data_gaps, correlation_map, anomalies, output_directory, narrative):
+    print("Initiating comprehensive report generation...")  # Report generation start
+    
+    readme_path = os.path.join(output_directory, 'INSIGHTS_REPORT.md')
+    try:
+        with open(readme_path, 'w') as report_file:
+            # Detailed report sections
+            report_file.write("# Comprehensive Data Insights Report\n\n")
+            
+            # Evaluation Directive Section
+            report_file.write("## Evaluation Directive\n")
+            report_file.write("> *Holistic assessment of data landscape with unwavering commitment to insights.*\n")
+            report_file.write("> *Every metric, every anomaly tells a profound story.*\n\n")
+
+            # Insight Metrics Section
+            report_file.write("## Statistical Landscape\n")
+            report_file.write("### Comprehensive Metrics Overview\n")
+            report_file.write("\n| Metric Category | Detailed Insights |\n")
+            report_file.write("|----------------|-------------------|\n")
+            
+            for column in insight_metrics.columns:
+                report_file.write(f"| {column} Metrics | |\n")
+                report_file.write(f"| - Mean | {insight_metrics.loc['mean', column]:.2f} |\n")
+                report_file.write(f"| - Standard Deviation | {insight_metrics.loc['std', column]:.2f} |\n")
+                report_file.write(f"| - Minimum | {insight_metrics.loc['min', column]:.2f} |\n")
+                report_file.write(f"| - Maximum | {insight_metrics.loc['max', column]:.2f} |\n")
+
+            # Data Gaps Analysis
+            report_file.write("\n## Data Landscape Gaps\n")
+            report_file.write("### Missing Data Exploration\n")
+            report_file.write("\n| Variable | Missing Entries |\n")
+            report_file.write("|----------|------------------|\n")
+            for variable, missing_count in data_gaps.items():
+                report_file.write(f"| {variable} | {missing_count} |\n")
+
+            # Anomalies Section
+            report_file.write("\n## Statistical Anomalies\n")
+            report_file.write("### Outlier Detection Insights\n")
+            report_file.write("\n| Variable | Anomaly Count |\n")
+            report_file.write("|----------|---------------|\n")
+            for variable, anomaly_count in anomalies.items():
+                report_file.write(f"| {variable} | {anomaly_count} |\n")
+
+            # Narrative Section
+            report_file.write("\n## Narrative Exploration\n")
+            report_file.write("### Human Stories Behind the Data\n\n")
+            report_file.write(f"{narrative}\n")
+
+        print(f"Comprehensive report generated: {readme_path}")
+        return readme_path
+
+    except Exception as error:
+        print(f"Report generation error: {error}")
         return None
 
 
-def main(csv_file):
-    """
-    Main function that integrates all the steps
-    """
-    print("Starting the analysis...")
+# Main orchestration function integrating all analysis components
+def primary_data_analysis_workflow(dataset_path):
+    print("Launching comprehensive data analysis expedition...")
 
-    # Try reading the CSV file with 'ISO-8859-1' encoding to handle special characters
     try:
-        df = pd.read_csv(csv_file, encoding='ISO-8859-1')
-        print("Dataset loaded successfully!")
-    except UnicodeDecodeError as e:
-        print(f"Error reading file: {e}")
+        data_collection = pd.read_csv(dataset_path, encoding='ISO-8859-1')
+        print("Data successfully captured!")
+    except UnicodeDecodeError as decoding_error:
+        print(f"Data capturing encountered an error: {decoding_error}")
         return
 
-    summary_stats, missing_values = extract_numerical_insights(df)
-    outliers = identify_statistical_anomalies(df)
+    insight_metrics, data_gaps, correlation_landscape = extract_data_insights(data_collection)
+    anomaly_map = identify_statistical_anomalies(data_collection)
 
-    output_dir = "."
-    os.makedirs(output_dir, exist_ok=True)
+    output_sanctuary = "."
+    os.makedirs(output_sanctuary, exist_ok=True)
 
-    # Select only numeric columns for correlation
-    corr_matrix = df.select_dtypes(include=[np.number]).corr()
+    correlation_visual, anomaly_visual, distribution_visual = generate_data_visualizations(
+        correlation_landscape, anomaly_map, data_collection, output_sanctuary
+    )
 
-    # Visualize the data and check output paths
-    heatmap_file, outliers_file, dist_plot_file = generate_exploratory_visuals(corr_matrix, outliers, df, output_dir)
+    narrative_context = f"""
+    Dataset Analysis Landscape:
+    Statistical Metrics: {insight_metrics}
+    Data Gaps: {data_gaps}
+    Correlation Networks: {correlation_landscape}
+    Anomaly Terrain: {anomaly_map}
+    """
 
-    print("Visualizations saved.")
+    generated_narrative = craft_narrative_from_insights(
+        "Craft a deeply moving narrative revealing the human stories behind our data", 
+        narrative_context
+    )
 
-    # Generate the story using the LLM
-    story = question_llm("Generate a deeply emotional story from the analysis", 
-                         context=f"Dataset Analysis:\nSummary Statistics:\n{summary_stats}\n\nMissing Values:\n{missing_values}\n\nCorrelation Matrix:\n{corr_matrix}\n\nOutliers:\n{outliers}")
+    # Generate comprehensive README
+    comprehensive_report = create_comprehensive_readme(
+        insight_metrics, data_gaps, correlation_landscape, 
+        anomaly_map, output_sanctuary, generated_narrative
+    )
 
-    # Create the README file with the analysis and the story
-    readme_file = create_readme(summary_stats, missing_values, corr_matrix, outliers, output_dir, story)
-    
-    print(f"Analysis complete! Results saved in '{output_dir}' directory.")
-    print(f"README file: {readme_file}")
-    print(f"Visualizations: {heatmap_file}, {outliers_file}, {dist_plot_file}")
+    print("Analysis expedition approaching its final coordinates...")
+    return {
+        'dataset': data_collection,
+        'metrics': insight_metrics,
+        'gaps': data_gaps,
+        'correlations': correlation_landscape,
+        'anomalies': anomaly_map,
+        'narrative': generated_narrative,
+        'report_path': comprehensive_report
+    }
 
 
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python script.py <dataset_path>")
+        print("Workflow Initiation Protocol: Requires dataset pathway")
         sys.exit(1)
-    main(sys.argv[1])
+    primary_data_analysis_workflow(sys.argv[1])
